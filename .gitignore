@@ -15,8 +15,9 @@ ENV/
 
 
 # --- Data Folder ---
-data/
-!data/.gitkeep
+data/images/*
+!data/images/
+!data/dataset.csv
 
 
 # --- Secrets / Configs ---
