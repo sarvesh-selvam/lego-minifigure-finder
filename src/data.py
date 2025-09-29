@@ -53,7 +53,6 @@ def make_loaders(
     images_subdir="images",
     batch_size=32,
     num_workers=0,         # macOS: start at 0; bump later if stable
-    pin_memory=True,
     image_size=224,
 ):
     csvs = {
@@ -71,10 +70,10 @@ def make_loaders(
 
     loaders = {
         "train": DataLoader(ds["train"], batch_size=batch_size, shuffle=True,
-                            num_workers=num_workers, pin_memory=pin_memory),
+                            num_workers=num_workers),
         "val":   DataLoader(ds["val"], batch_size=batch_size, shuffle=False,
-                            num_workers=num_workers, pin_memory=pin_memory),
+                            num_workers=num_workers),
         "test":  DataLoader(ds["test"], batch_size=batch_size, shuffle=False,
-                            num_workers=num_workers, pin_memory=pin_memory),
+                            num_workers=num_workers),
     }
     return loaders
