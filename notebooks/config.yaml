@@ -1,10 +1,10 @@
 
 # model hyperparameters
 
-model: "Custom_CNN"
+model: "Resnet"
 optimizer: "Adam"
 
-epochs: 10
+epochs: 40
 lr: 1e-3
 weight_decay: 0.01
 
