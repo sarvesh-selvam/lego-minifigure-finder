@@ -13,7 +13,3 @@ def set_seed(seed: int = 27) -> None:
 
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-
-    # Optional stricter determinism (may reduce performance):
-    # torch.backends.cudnn.deterministic = True
-    # torch.backends.cudnn.benchmark = False
