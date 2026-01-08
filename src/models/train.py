@@ -1,6 +1,10 @@
 import os
+import time
 import torch
+from torch import nn, optim
 from sklearn.metrics import accuracy_score
+
+from models.evaluate import evaluate
 
 def train_one_epoch(model, loader, criterion, optimizer, device):
     model.train()
