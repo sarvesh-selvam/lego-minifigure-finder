@@ -10,7 +10,7 @@ arch: resnet18          # smallcnn | resnet18
 pretrained: true        # only used for resnet18
 num_classes: 2
 epochs: 10
-lr: 1e-3
+lr: 0.0003
 weight_decay: 0.0
 seed: 27
 
