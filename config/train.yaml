@@ -16,7 +16,7 @@ seed: 27
 
 # ---- Outputs ----
 out_dir: artifacts
-run_name: resnet18_v1
+run_name: test_v1
 
 # ---- Optional: S3 ----
 # Leave these as null (or comment out) for local training.
