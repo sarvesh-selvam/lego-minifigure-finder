@@ -4,7 +4,7 @@ import torch
 from torch import nn, optim
 from sklearn.metrics import accuracy_score
 
-# from models.evaluate import evaluate
+from src.model.evaluate import evaluate
 
 def train_one_epoch(model, loader, criterion, optimizer, device):
     model.train()
@@ -34,7 +34,7 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
 
 
 
-def fit(model, loaders, epochs, lr=1e-3, weight_decay=0.0):
+def fit(model, loaders, epochs, lr=1e-3, weight_decay=0.0, device="cpu"):
     
     model.to(device)
     criterion = nn.CrossEntropyLoss()
