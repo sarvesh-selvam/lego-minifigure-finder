@@ -1,0 +1,28 @@
+# ---- Data ----
+data_dir: data
+images_subdir: images
+image_size: 224
+batch_size: 32
+num_workers: 0
+
+# ---- Model / Training ----
+arch: resnet18          # smallcnn | resnet18
+pretrained: true        # only used for resnet18
+num_classes: 2
+epochs: 10
+lr: 0.0003
+weight_decay: 0.0
+seed: 27
+
+# ---- Outputs ----
+out_dir: artifacts
+run_name: resnet18_v1
+
+# ---- Optional: S3 ----
+# Leave these as null (or comment out) for local training.
+s3_model_uri: null
+s3_dataset_uri: null
+
+# Example S3 values (uncomment and fill in when ready)
+# s3_dataset_uri: s3://your-bucket/lego-minifig/datasets/v1/
+# s3_model_uri: s3://your-bucket/lego-minifig/models/resnet18/resnet18_v1/
