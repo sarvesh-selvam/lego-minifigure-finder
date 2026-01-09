@@ -4,7 +4,7 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-
+from src.data.transform import _tfms
 
 class CSVDataset(Dataset):
     def __init__(self, csv_path, img_dir, transforms=None):
