@@ -11,12 +11,13 @@ from PIL import Image
 from .data import build_transforms, IMAGENET_MEAN, IMAGENET_STD
 from .models import SmallCNN, build_resnet18
 
-def _device_default() -> torch.device:
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
+# def _device_default() -> torch.device:
+#     if torch.cuda.is_available():
+#         return torch.device("cuda")
+#     if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+#         return torch.device("mps")
+#     return torch.device("cpu")
+
 
 def save_bundle(
     bundle_dir: str | Path,
@@ -48,6 +49,7 @@ def save_bundle(
         "threshold": float(threshold),
     }
     (bundle_dir / "bundle.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
 
 def _build_model_from_arch(arch: str, num_classes: int, pretrained: bool = False) -> torch.nn.Module:
     arch = arch.lower()
@@ -83,6 +85,7 @@ class Predictor:
             "positive_prob": float(probs[1]) if len(probs) > 1 else float(probs[0]),
             "is_positive": (float(probs[1]) >= self.threshold) if len(probs) > 1 else (float(probs[0]) >= self.threshold),
         }
+
 
 def load_bundle(bundle_dir: str | Path, device: Optional[str] = None) -> Predictor:
     bundle_dir = Path(bundle_dir)
