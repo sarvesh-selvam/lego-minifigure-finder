@@ -10,6 +10,15 @@ from src.data.transform import build_transforms, IMAGENET_MEAN, IMAGENET_STD
 from src.classifier import SmallCNN, build_resnet18
 
 
+def _build_model_from_arch(arch: str, num_classes: int, pretrained: bool = False) -> torch.nn.Module:
+    arch = arch.lower()
+    if arch in {"smallcnn", "small_cnn"}:
+        return SmallCNN(num_classes=num_classes)
+    if arch in {"resnet18", "resnet"}:
+        return build_resnet18(num_classes=num_classes, pretrained=pretrained)
+    raise ValueError(f"Unknown arch: {arch}")
+
+
 
 def save_bundle(
     bundle_dir: str | Path,
