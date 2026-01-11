@@ -1,2 +1,62 @@
-import os
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+import json
 
+import torch
+from PIL import Image
+
+from src.data.transform import build_transforms, IMAGENET_MEAN, IMAGENET_STD
+from src.classifier import SmallCNN, build_resnet18
+
+
+
+def save_bundle(
+    bundle_dir: str | Path,
+    model: torch.nn.Module,
+    arch: str,
+    class_names: List[str],
+    image_size: int = 224,
+    mean: List[float] = IMAGENET_MEAN,
+    std: List[float] = IMAGENET_STD,
+    threshold: float = 0.5,
+):
+    bundle_dir = Path(bundle_dir)
+    bundle_dir.mkdir(parents=True, exist_ok=True)
+
+    torch.save(
+        {
+            "arch": arch,
+            "state_dict": {k: v.detach().cpu() for k, v in model.state_dict().items()},
+        },
+        bundle_dir / "model.pt",
+    )
+
+    meta = {
+        "arch": arch,
+        "class_names": class_names,
+        "image_size": int(image_size),
+        "mean": mean,
+        "std": std,
+        "threshold": float(threshold),
+    }
+    (bundle_dir / "bundle.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+
+def load_bundle(bundle_dir: str | Path, device: Optional[str] = None) -> Predictor:
+    bundle_dir = Path(bundle_dir)
+    meta = json.loads((bundle_dir / "bundle.json").read_text(encoding="utf-8"))
+    ckpt = torch.load(bundle_dir / "model.pt", map_location="cpu")
+
+    class_names = meta["class_names"]
+    image_size = int(meta["image_size"])
+    threshold = float(meta.get("threshold", 0.5))
+    arch = meta["arch"]
+
+    model = _build_model_from_arch(arch, num_classes=len(class_names), pretrained=False)
+    model.load_state_dict(ckpt["state_dict"], strict=True)
+
+    dev = torch.device(device) if device else _device_default()
+    model.to(dev)
+
+    return Predictor(model=model, class_names=class_names, image_size=image_size, threshold=threshold, device=dev)
