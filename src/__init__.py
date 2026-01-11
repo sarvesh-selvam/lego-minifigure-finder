@@ -1,1 +1,1 @@
-__all__ = ["app", "classifier", "data", "model", "utils"]
+__all__ = ["app", "classifier", "data", "inference", "model", "utils"]
