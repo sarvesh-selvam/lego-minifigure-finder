@@ -6,14 +6,6 @@ import torch
 
 from sklearn.metrics import classification_report
 
-from src.utils.config import load_config
-
-# from .data import make_loaders
-# from .models import SmallCNN, build_resnet18
-# from .train_utils import fit, evaluate
-# from .inference import save_bundle
-# from .s3_utils import download_s3_prefix, upload_dir_to_s3
-
 
 from src.data.data_loader import make_loaders
 from src.classifier.resnet import build_resnet18
@@ -23,6 +15,7 @@ from src.model.evaluate import evaluate
 
 from src.utils.seed import set_seed
 from src.utils.device import get_device
+from src.utils.config import load_config
 
 
 
