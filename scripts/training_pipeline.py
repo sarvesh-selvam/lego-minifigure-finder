@@ -16,6 +16,7 @@ from src.model.evaluate import evaluate
 from src.utils.seed import set_seed
 from src.utils.device import get_device
 from src.utils.config import load_config
+from src.inference.bundle import save_bundle
 
 
 
