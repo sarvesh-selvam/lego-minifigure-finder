@@ -1,21 +1,10 @@
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-import json
+from typing import Dict, List, Optional
 
 import torch
 from PIL import Image
 
-from .data import build_transforms, IMAGENET_MEAN, IMAGENET_STD
-from .models import SmallCNN, build_resnet18
-
-# def _device_default() -> torch.device:
-#     if torch.cuda.is_available():
-#         return torch.device("cuda")
-#     if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
-#         return torch.device("mps")
-#     return torch.device("cpu")
-
+from src.data.transform import _tfms
 
 
 @dataclass
@@ -28,7 +17,7 @@ class Predictor:
 
     def predict_pil(self, img: Image.Image) -> Dict:
         self.model.eval()
-        tf = build_transforms(self.image_size)["val"]
+        tf = _tfms(self.image_size)["val"]
         x = tf(img).unsqueeze(0).to(self.device)
 
         with torch.no_grad():

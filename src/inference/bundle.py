@@ -1,25 +1,23 @@
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional
 import json
 
 import torch
-from PIL import Image
 
-from src.data.transform import build_transforms, IMAGENET_MEAN, IMAGENET_STD
-from src.classifier import SmallCNN, build_resnet18
+from src.data.transform import IMAGENET_MEAN, IMAGENET_STD
+from src.classifier.resnet import build_resnet18
+from src.classifier.small_cnn import SmallCNN
+from src.inference.predictor import Predictor
+from src.utils.device import get_device
 
 
-
-
-def _build_model_from_arch(arch: str, num_classes: int, pretrained: bool = False) -> torch.nn.Module:
+def _build_model_from_arch(arch: str, num_classes: int) -> torch.nn.Module:
     arch = arch.lower()
     if arch in {"smallcnn", "small_cnn"}:
         return SmallCNN(num_classes=num_classes)
     if arch in {"resnet18", "resnet"}:
-        return build_resnet18(num_classes=num_classes, pretrained=pretrained)
+        return build_resnet18(num_classes=num_classes, pretrained=False)
     raise ValueError(f"Unknown arch: {arch}")
-
 
 
 def save_bundle(
@@ -54,21 +52,20 @@ def save_bundle(
     (bundle_dir / "bundle.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
 
-
 def load_bundle(bundle_dir: str | Path, device: Optional[str] = None) -> Predictor:
     bundle_dir = Path(bundle_dir)
     meta = json.loads((bundle_dir / "bundle.json").read_text(encoding="utf-8"))
-    ckpt = torch.load(bundle_dir / "model.pt", map_location="cpu")
+    ckpt = torch.load(bundle_dir / "model.pt", map_location="cpu", weights_only=True)
 
     class_names = meta["class_names"]
     image_size = int(meta["image_size"])
     threshold = float(meta.get("threshold", 0.5))
     arch = meta["arch"]
 
-    model = _build_model_from_arch(arch, num_classes=len(class_names), pretrained=False)
+    model = _build_model_from_arch(arch, num_classes=len(class_names))
     model.load_state_dict(ckpt["state_dict"], strict=True)
 
-    dev = torch.device(device) if device else _device_default()
+    dev = torch.device(device) if device else get_device()
     model.to(dev)
 
     return Predictor(model=model, class_names=class_names, image_size=image_size, threshold=threshold, device=dev)
