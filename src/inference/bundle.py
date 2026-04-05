@@ -10,6 +10,8 @@ from src.data.transform import build_transforms, IMAGENET_MEAN, IMAGENET_STD
 from src.classifier import SmallCNN, build_resnet18
 
 
+
+
 def _build_model_from_arch(arch: str, num_classes: int, pretrained: bool = False) -> torch.nn.Module:
     arch = arch.lower()
     if arch in {"smallcnn", "small_cnn"}:
@@ -50,6 +52,7 @@ def save_bundle(
         "threshold": float(threshold),
     }
     (bundle_dir / "bundle.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
 
 
 def load_bundle(bundle_dir: str | Path, device: Optional[str] = None) -> Predictor:
