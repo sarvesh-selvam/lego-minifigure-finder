@@ -19,10 +19,10 @@ out_dir: artifacts
 run_name: test_v1
 
 # ---- Optional: S3 ----
-# Leave these as null (or comment out) for local training.
+# Leave these as null for local training.
 s3_model_uri: null
 s3_dataset_uri: null
 
-# Example S3 values (uncomment and fill in when ready)
+# Example S3 values
 # s3_dataset_uri: s3://your-bucket/lego-minifig/datasets/v1/
 # s3_model_uri: s3://your-bucket/lego-minifig/models/resnet18/resnet18_v1/
