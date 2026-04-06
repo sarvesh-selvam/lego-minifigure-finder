@@ -1,8 +1,10 @@
 import argparse
 from pathlib import Path
 import torch
+import mlflow
+import mlflow.pytorch
 
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, f1_score
 
 from src.data.data_loader import make_loaders
 from src.classifier.resnet import build_resnet18
@@ -58,27 +60,72 @@ def main():
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"  {arch}  |  {n_params:,} trainable parameters")
 
-    # --- Training ---
-    print(f"\nTraining for {cfg.epochs} epochs...\n")
-    model, _ = fit(
-        model, loaders,
-        epochs=cfg.epochs, lr=cfg.lr, weight_decay=cfg.weight_decay, device=device,
-    )
+    # --- MLflow run ---
+    mlflow.set_tracking_uri("mlflow")
+    mlflow.set_experiment("lego-minifigure-finder")
 
-    # --- Evaluation ---
-    print("\nEvaluating on test set...")
-    crit = torch.nn.CrossEntropyLoss()
-    test_loss, test_acc, y_true, y_pred = evaluate(model, loaders["test"], crit, device=torch.device(device))
-    print(f"  loss={test_loss:.4f}  acc={test_acc:.4f}")
-    print(classification_report(y_true, y_pred, target_names=["not_minifig", "minifig"], digits=4))
+    with mlflow.start_run(run_name=cfg.run_name):
 
-    # --- Save bundle ---
-    run_dir = Path(cfg.out_dir) / cfg.run_name
-    bundle_dir = run_dir / "bundle"
-    bundle_dir.mkdir(parents=True, exist_ok=True)
-    class_names = ["not_minifig", "minifig"]
-    save_bundle(bundle_dir, model=model, arch=arch, class_names=class_names, image_size=cfg.image_size)
-    print(f"Bundle saved to {bundle_dir}")
+        # Log hyperparameters
+        mlflow.log_params({
+            "arch": arch,
+            "pretrained": cfg.pretrained,
+            "epochs": cfg.epochs,
+            "lr": cfg.lr,
+            "weight_decay": cfg.weight_decay,
+            "batch_size": cfg.batch_size,
+            "image_size": cfg.image_size,
+            "seed": cfg.seed,
+            "num_classes": cfg.num_classes,
+            "train_samples": len(loaders["train"].dataset),
+            "val_samples": len(loaders["val"].dataset),
+            "test_samples": len(loaders["test"].dataset),
+            "trainable_params": n_params,
+        })
+
+        # --- Training ---
+        print(f"\nTraining for {cfg.epochs} epochs...\n")
+        model, history = fit(
+            model, loaders,
+            epochs=cfg.epochs, lr=cfg.lr, weight_decay=cfg.weight_decay, device=device,
+        )
+
+        # Log per-epoch metrics
+        for entry in history:
+            step = entry["epoch"]
+            mlflow.log_metrics({
+                "train_loss": entry["train_loss"],
+                "train_acc":  entry["train_acc"],
+                "val_loss":   entry["val_loss"],
+                "val_acc":    entry["val_acc"],
+                "val_f1":     entry["val_f1"],
+            }, step=step)
+
+        # --- Evaluation ---
+        print("\nEvaluating on test set...")
+        crit = torch.nn.CrossEntropyLoss()
+        test_loss, test_acc, y_true, y_pred = evaluate(model, loaders["test"], crit, device=torch.device(device))
+        test_f1 = f1_score(y_true, y_pred, average="binary", zero_division=0)
+        print(f"  loss={test_loss:.4f}  acc={test_acc:.4f}  f1={test_f1:.4f}")
+        print(classification_report(y_true, y_pred, target_names=["not_minifig", "minifig"], digits=4))
+
+        mlflow.log_metrics({
+            "test_loss": test_loss,
+            "test_acc":  test_acc,
+            "test_f1":   test_f1,
+        })
+
+        # --- Save bundle ---
+        run_dir = Path(cfg.out_dir) / cfg.run_name
+        bundle_dir = run_dir / "bundle"
+        bundle_dir.mkdir(parents=True, exist_ok=True)
+        class_names = ["not_minifig", "minifig"]
+        save_bundle(bundle_dir, model=model, arch=arch, class_names=class_names, image_size=cfg.image_size)
+        print(f"Bundle saved to {bundle_dir}")
+
+        # Log bundle as MLflow artifact
+        mlflow.log_artifacts(str(bundle_dir), artifact_path="bundle")
+        print(f"MLflow run complete — view with: mlflow ui --backend-store-uri mlflow/")
 
 
 if __name__ == "__main__":
