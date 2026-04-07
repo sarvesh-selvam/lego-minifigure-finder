@@ -1,5 +1,7 @@
 import argparse
 from pathlib import Path
+
+import pandas as pd
 import torch
 import mlflow
 import mlflow.pytorch
@@ -17,6 +19,15 @@ from src.utils.config import load_config
 from src.inference.bundle import save_bundle
 
 
+def compute_class_weights(train_csv: str, num_classes: int) -> torch.Tensor:
+    """Compute inverse-frequency class weights from the training CSV."""
+    df = pd.read_csv(train_csv)
+    counts = df["label"].value_counts().sort_index().values.astype(float)
+    total = counts.sum()
+    weights = total / (num_classes * counts)
+    return torch.tensor(weights, dtype=torch.float)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True, help="Path to YAML config")
@@ -31,6 +42,7 @@ def main():
     print(f"Run name   : {cfg.run_name}")
     print(f"Arch       : {cfg.arch}  |  pretrained={cfg.pretrained}")
     print(f"Epochs     : {cfg.epochs}  |  lr={cfg.lr}  |  batch={cfg.batch_size}")
+    print(f"Freeze     : {cfg.freeze_epochs} epoch(s)")
 
     set_seed(cfg.seed)
     device = get_device()
@@ -49,6 +61,12 @@ def main():
           f"val={len(loaders['val'].dataset)} "
           f"test={len(loaders['test'].dataset)} samples")
 
+    # --- Class weights ---
+    train_csv = str(Path(cfg.data_dir) / "train.csv")
+    class_weights = compute_class_weights(train_csv, cfg.num_classes)
+    print(f"  class weights: {[f'{w:.3f}' for w in class_weights.tolist()]}"
+          f"  (not_minifig, minifig)")
+
     # --- Model ---
     print("\nBuilding model...")
     if cfg.arch.lower() in {"smallcnn", "small_cnn"}:
@@ -66,7 +84,6 @@ def main():
 
     with mlflow.start_run(run_name=cfg.run_name):
 
-        # Log hyperparameters
         mlflow.log_params({
             "arch": arch,
             "pretrained": cfg.pretrained,
@@ -77,6 +94,9 @@ def main():
             "image_size": cfg.image_size,
             "seed": cfg.seed,
             "num_classes": cfg.num_classes,
+            "freeze_epochs": cfg.freeze_epochs,
+            "class_weight_0": round(class_weights[0].item(), 4),
+            "class_weight_1": round(class_weights[1].item(), 4),
             "train_samples": len(loaders["train"].dataset),
             "val_samples": len(loaders["val"].dataset),
             "test_samples": len(loaders["test"].dataset),
@@ -87,24 +107,30 @@ def main():
         print(f"\nTraining for {cfg.epochs} epochs...\n")
         model, history = fit(
             model, loaders,
-            epochs=cfg.epochs, lr=cfg.lr, weight_decay=cfg.weight_decay, device=device,
+            epochs=cfg.epochs,
+            lr=cfg.lr,
+            weight_decay=cfg.weight_decay,
+            device=device,
+            class_weights=class_weights,
+            freeze_epochs=cfg.freeze_epochs,
         )
 
         # Log per-epoch metrics
         for entry in history:
-            step = entry["epoch"]
             mlflow.log_metrics({
                 "train_loss": entry["train_loss"],
                 "train_acc":  entry["train_acc"],
                 "val_loss":   entry["val_loss"],
                 "val_acc":    entry["val_acc"],
                 "val_f1":     entry["val_f1"],
-            }, step=step)
+            }, step=entry["epoch"])
 
         # --- Evaluation ---
         print("\nEvaluating on test set...")
         crit = torch.nn.CrossEntropyLoss()
-        test_loss, test_acc, y_true, y_pred = evaluate(model, loaders["test"], crit, device=torch.device(device))
+        test_loss, test_acc, y_true, y_pred = evaluate(
+            model, loaders["test"], crit, device=torch.device(device),
+        )
         test_f1 = f1_score(y_true, y_pred, average="binary", zero_division=0)
         print(f"  loss={test_loss:.4f}  acc={test_acc:.4f}  f1={test_f1:.4f}")
         print(classification_report(y_true, y_pred, target_names=["not_minifig", "minifig"], digits=4))
@@ -123,7 +149,6 @@ def main():
         save_bundle(bundle_dir, model=model, arch=arch, class_names=class_names, image_size=cfg.image_size)
         print(f"Bundle saved to {bundle_dir}")
 
-        # Log bundle as MLflow artifact
         mlflow.log_artifacts(str(bundle_dir), artifact_path="bundle")
         print(f"MLflow run complete — view with: mlflow ui --backend-store-uri mlflow/")
 
