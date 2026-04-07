@@ -36,4 +36,8 @@ class TrainConfig:
 def load_config(path: str | Path) -> TrainConfig:
     path = Path(path)
     data: Dict[str, Any] = yaml.safe_load(path.read_text(encoding="utf-8"))
+    # PyYAML parses scientific notation (e.g. 1e-4) as a string — cast floats explicitly
+    for field in ("lr", "weight_decay"):
+        if field in data:
+            data[field] = float(data[field])
     return TrainConfig(**data)
