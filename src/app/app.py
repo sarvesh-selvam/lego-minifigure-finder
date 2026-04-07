@@ -36,10 +36,10 @@ async def lifespan(app: FastAPI):
             "Run the training pipeline first."
         )
 
-    # Download the bundle artifact to a temp directory and load it
-    artifact_uri = f"models:/{REGISTERED_MODEL}@{MODEL_ALIAS}"
+    # Download the bundle artifacts from the run associated with the registered version
+    bundle_uri = f"runs:/{version.run_id}/bundle"
     with tempfile.TemporaryDirectory() as tmp:
-        bundle_dir = Path(mlflow.artifacts.download_artifacts(artifact_uri, dst_path=tmp))
+        bundle_dir = Path(mlflow.artifacts.download_artifacts(bundle_uri, dst_path=tmp))
         predictor = load_bundle(bundle_dir)
         bundle_meta = json.loads((bundle_dir / "bundle.json").read_text(encoding="utf-8"))
 
