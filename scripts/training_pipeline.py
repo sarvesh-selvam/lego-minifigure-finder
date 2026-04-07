@@ -151,9 +151,12 @@ def main():
 
         mlflow.log_artifacts(str(bundle_dir), artifact_path="bundle")
 
+        # Log the model with mlflow.pytorch so it can be registered
+        mlflow.pytorch.log_model(model, name="pytorch_model")
+
         # --- Register model and promote to production ---
         run_id = mlflow.active_run().info.run_id
-        model_uri = f"runs:/{run_id}/bundle"
+        model_uri = f"runs:/{run_id}/pytorch_model"
         registered = mlflow.register_model(model_uri, "lego-minifigure-finder")
         print(f"Model registered as version {registered.version}")
 
