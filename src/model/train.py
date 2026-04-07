@@ -1,4 +1,6 @@
 import time
+from typing import Optional
+
 import torch
 from torch import nn, optim
 from sklearn.metrics import accuracy_score, f1_score
@@ -37,10 +39,50 @@ def train_one_epoch(model, loader, criterion, optimizer, device, epoch, total_ep
     return epoch_loss, epoch_acc
 
 
-def fit(model, loaders, epochs, lr=1e-3, weight_decay=0.0, device="cpu"):
+def _set_backbone_grad(model: nn.Module, requires_grad: bool) -> None:
+    """Freeze or unfreeze all layers except the final FC head."""
+    for name, param in model.named_parameters():
+        if "fc" not in name:
+            param.requires_grad = requires_grad
+
+
+def fit(
+    model: nn.Module,
+    loaders: dict,
+    epochs: int,
+    lr: float = 1e-3,
+    weight_decay: float = 0.0,
+    device: str = "cpu",
+    class_weights: Optional[torch.Tensor] = None,
+    freeze_epochs: int = 0,
+) -> tuple:
+    """
+    Train the model.
+
+    Args:
+        class_weights:  Optional 1-D tensor of per-class weights for the loss.
+                        Pass to address class imbalance.
+        freeze_epochs:  Number of epochs to train with the backbone frozen.
+                        After this, all parameters are unfrozen and training
+                        continues with the full model. 0 = no freezing.
+    """
     model.to(device)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+    # Weighted loss for class imbalance
+    weight_tensor = class_weights.to(device) if class_weights is not None else None
+    criterion = nn.CrossEntropyLoss(weight=weight_tensor)
+
+    # Phase 1: optionally freeze backbone and train only the head
+    if freeze_epochs > 0:
+        _set_backbone_grad(model, requires_grad=False)
+        trainable = [p for p in model.parameters() if p.requires_grad]
+        print(f"Backbone frozen for first {freeze_epochs} epoch(s) — "
+              f"training {sum(p.numel() for p in trainable):,} params")
+
+    optimizer = optim.Adam(
+        filter(lambda p: p.requires_grad, model.parameters()),
+        lr=lr, weight_decay=weight_decay,
+    )
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 
     best_val_f1 = -1
@@ -48,8 +90,25 @@ def fit(model, loaders, epochs, lr=1e-3, weight_decay=0.0, device="cpu"):
     history = []
 
     for epoch in range(1, epochs + 1):
+
+        # Phase 2: unfreeze backbone after freeze_epochs
+        if freeze_epochs > 0 and epoch == freeze_epochs + 1:
+            _set_backbone_grad(model, requires_grad=True)
+            n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+            print(f"\nBackbone unfrozen at epoch {epoch} — "
+                  f"now training {n_params:,} params")
+            # Reinitialise optimizer to pick up newly unfrozen params
+            optimizer = optim.Adam(
+                model.parameters(), lr=lr, weight_decay=weight_decay,
+            )
+            scheduler = optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, T_max=epochs - freeze_epochs,
+            )
+
         t0 = time.time()
-        tr_loss, tr_acc = train_one_epoch(model, loaders["train"], criterion, optimizer, device, epoch, epochs)
+        tr_loss, tr_acc = train_one_epoch(
+            model, loaders["train"], criterion, optimizer, device, epoch, epochs,
+        )
         va_loss, va_acc, y_true, y_pred = evaluate(model, loaders["val"], criterion, device)
         va_f1 = f1_score(y_true, y_pred, average="binary", zero_division=0)
         scheduler.step()
