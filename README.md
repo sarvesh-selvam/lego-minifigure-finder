@@ -1,6 +1,6 @@
 # lego-minifigure-finder
 
-A binary image classifier that detects whether an image contains a LEGO minifigure. Built as an MLOps project using PyTorch, with support for experiment tracking via MLflow and a pluggable inference bundle for serving.
+A binary image classifier that detects whether an image contains a LEGO minifigure. Built as an MLOps project using PyTorch, with experiment tracking via MLflow, a REST API via FastAPI, and an interactive UI via Streamlit.
 
 ## Project Structure
 
@@ -25,7 +25,9 @@ lego-minifigure-finder/
 │   ├── inference/              # Bundle save/load and Predictor
 │   ├── model/                  # Training loop and evaluation
 │   ├── utils/                  # Config, device, seed helpers
-│   └── app/                    # FastAPI serving app (WIP)
+│   └── app/
+│       ├── app.py              # FastAPI REST API
+│       └── streamlit_app.py    # Streamlit interactive UI
 ├── mlflow/                     # MLflow experiment tracking runs
 ├── artifacts/                  # Saved model bundles (gitignored)
 └── requirements.txt
@@ -67,10 +69,11 @@ Key config options:
 | `batch_size` | `32` | Batch size |
 | `run_name` | `test_v1` | Output directory name under `artifacts/` |
 
-The training loop saves the checkpoint with the best validation F1 score. At the end of training, a model bundle is written to `artifacts/{run_name}/bundle/`.
+The training loop saves the checkpoint with the best validation F1 score and logs all metrics to MLflow. At the end of training, a model bundle is written to `artifacts/{run_name}/bundle/`.
 
 ## Inference
 
+**CLI:**
 ```bash
 python -m scripts.inference_pipeline \
     --bundle-dir artifacts/test_v1/bundle \
@@ -78,7 +81,6 @@ python -m scripts.inference_pipeline \
 ```
 
 Output:
-
 ```
 Prediction : minifig
 Confidence : 0.9312
@@ -86,33 +88,70 @@ Is minifig : True
 All probs  : [0.0688, 0.9312]
 ```
 
+**Python:**
+```python
+from src.inference.bundle import load_bundle
+from PIL import Image
+
+predictor = load_bundle("artifacts/test_v1/bundle")
+result = predictor.predict_pil(Image.open("image.jpg").convert("RGB"))
+print(result)
+```
+
+## Serving
+
+The project includes two serving options that work together.
+
+### FastAPI (REST API)
+
+```bash
+uvicorn src.app.app:app --reload
+```
+
+Endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Liveness check, confirms model is loaded |
+| `POST` | `/predict` | Upload an image, returns JSON prediction |
+
+Example:
+```bash
+curl -X POST http://localhost:8000/predict \
+     -F "file=@path/to/image.jpg"
+```
+
+### Streamlit (Interactive UI)
+
+In a second terminal:
+```bash
+streamlit run src/app/streamlit_app.py
+```
+
+Opens at `http://localhost:8501`. Upload an image and click **Run prediction** to see results. The sidebar shows live API status.
+
+> Both servers must be running at the same time for the Streamlit UI to work.
+
+## Experiment Tracking
+
+MLflow tracks every training run automatically. To view the UI:
+
+```bash
+mlflow ui --backend-store-uri mlflow/
+```
+
+Then open `http://localhost:5000`. Each run logs:
+- Hyperparameters (arch, lr, epochs, batch size, etc.)
+- Per-epoch train/val loss, accuracy, and F1
+- Final test loss, accuracy, and F1
+- Model bundle as a downloadable artifact
+
 ## Model Bundle
 
 The bundle directory contains:
 
 - `model.pt` — model weights and architecture name
 - `bundle.json` — metadata (class names, image size, mean/std, threshold)
-
-Load it in Python:
-
-```python
-from src.inference.bundle import load_bundle
-
-predictor = load_bundle("artifacts/test_v1/bundle")
-from PIL import Image
-result = predictor.predict_pil(Image.open("image.jpg").convert("RGB"))
-print(result)
-```
-
-## Experiment Tracking
-
-MLflow is used for tracking runs. To view the UI:
-
-```bash
-mlflow ui --backend-store-uri mlflow/
-```
-
-Then open `http://localhost:5000` in your browser.
 
 ## Architectures
 
