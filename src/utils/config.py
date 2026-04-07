@@ -23,6 +23,8 @@ class TrainConfig:
     weight_decay: float = 0.0
     seed: int = 42
 
+    freeze_epochs: int = 3
+
     # Outputs
     out_dir: str = "artifacts"
     run_name: str = "run"
