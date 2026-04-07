@@ -1,35 +1,66 @@
 import io
+import json
+import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import mlflow
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from PIL import Image
 
-from src.inference.bundle import load_bundle
 from src.inference.predictor import Predictor
+from src.inference.bundle import load_bundle
 
-# ---------------------------------------------------------------------------
-# Configuration — point this at your trained bundle directory
-# ---------------------------------------------------------------------------
-BUNDLE_DIR = Path("artifacts/test_v1/bundle")
+MLFLOW_TRACKING_URI = "mlflow"
+REGISTERED_MODEL = "lego-minifigure-finder"
+MODEL_ALIAS = "production"
 
 predictor: Predictor | None = None
+model_info: dict = {}
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load the model bundle once on startup, release on shutdown."""
-    global predictor
-    if not BUNDLE_DIR.exists():
+    global predictor, model_info
+
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    client = mlflow.MlflowClient()
+
+    # Resolve the production alias to a concrete version
+    try:
+        version = client.get_model_version_by_alias(REGISTERED_MODEL, MODEL_ALIAS)
+    except Exception:
         raise RuntimeError(
-            f"Bundle not found at '{BUNDLE_DIR}'. "
-            "Run the training pipeline first or update BUNDLE_DIR in app.py."
+            f"No '{MODEL_ALIAS}' alias found for model '{REGISTERED_MODEL}'. "
+            "Run the training pipeline first."
         )
-    predictor = load_bundle(BUNDLE_DIR)
-    print(f"Model loaded from {BUNDLE_DIR}")
+
+    # Download the bundle artifact to a temp directory and load it
+    artifact_uri = f"models:/{REGISTERED_MODEL}@{MODEL_ALIAS}"
+    with tempfile.TemporaryDirectory() as tmp:
+        bundle_dir = Path(mlflow.artifacts.download_artifacts(artifact_uri, dst_path=tmp))
+        predictor = load_bundle(bundle_dir)
+        bundle_meta = json.loads((bundle_dir / "bundle.json").read_text(encoding="utf-8"))
+
+    model_info = {
+        "registered_model": REGISTERED_MODEL,
+        "alias": MODEL_ALIAS,
+        "version": version.version,
+        "run_id": version.run_id,
+        "arch": bundle_meta["arch"],
+        "class_names": bundle_meta["class_names"],
+        "image_size": bundle_meta["image_size"],
+        "threshold": bundle_meta["threshold"],
+    }
+
+    print(f"Model         : {REGISTERED_MODEL} @{MODEL_ALIAS} (version {version.version})")
+    print(f"Arch          : {bundle_meta['arch']}")
+    print(f"Classes       : {bundle_meta['class_names']}")
+    print(f"Threshold     : {bundle_meta['threshold']}")
     yield
     predictor = None
+    model_info = {}
 
 
 app = FastAPI(
@@ -42,8 +73,8 @@ app = FastAPI(
 
 @app.get("/health")
 def health():
-    """Liveness check."""
-    return {"status": "ok", "model_loaded": predictor is not None}
+    """Liveness check — reports which model version is loaded."""
+    return {"status": "ok", "model_loaded": predictor is not None, **model_info}
 
 
 @app.post("/predict")
