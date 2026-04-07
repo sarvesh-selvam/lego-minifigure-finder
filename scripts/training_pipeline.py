@@ -150,6 +150,20 @@ def main():
         print(f"Bundle saved to {bundle_dir}")
 
         mlflow.log_artifacts(str(bundle_dir), artifact_path="bundle")
+
+        # --- Register model and promote to production ---
+        run_id = mlflow.active_run().info.run_id
+        model_uri = f"runs:/{run_id}/bundle"
+        registered = mlflow.register_model(model_uri, "lego-minifigure-finder")
+        print(f"Model registered as version {registered.version}")
+
+        client = mlflow.MlflowClient()
+        client.set_registered_model_alias(
+            name="lego-minifigure-finder",
+            alias="production",
+            version=registered.version,
+        )
+        print(f"Version {registered.version} promoted to @production")
         print(f"MLflow run complete — view with: mlflow ui --backend-store-uri mlflow/")
 
 
