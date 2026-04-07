@@ -32,6 +32,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True, help="Path to YAML config")
     ap.add_argument("--run-name", default=None, help="Override run name")
+    ap.add_argument("--alias", default="production", help="MLflow alias to assign (e.g. staging, production)")
     args = ap.parse_args()
 
     # --- Config ---
@@ -154,19 +155,37 @@ def main():
         # Log the model with mlflow.pytorch so it can be registered
         mlflow.pytorch.log_model(model, name="pytorch_model")
 
-        # --- Register model and promote to production ---
+        # --- Register model ---
         run_id = mlflow.active_run().info.run_id
         model_uri = f"runs:/{run_id}/pytorch_model"
-        registered = mlflow.register_model(model_uri, "lego-minifigure-finder")
-        print(f"Model registered as version {registered.version}")
+        registered = mlflow.register_model(model_uri, arch)
+        print(f"Model registered as '{arch}' version {registered.version}")
 
+        # --- Conditionally promote alias ---
         client = mlflow.MlflowClient()
-        client.set_registered_model_alias(
-            name="lego-minifigure-finder",
-            alias="production",
-            version=registered.version,
-        )
-        print(f"Version {registered.version} promoted to @production")
+        should_promote = True
+
+        try:
+            current = client.get_model_version_by_alias(arch, args.alias)
+            current_run = client.get_run(current.run_id)
+            current_f1 = current_run.data.metrics.get("test_f1", 0.0)
+            if test_f1 > current_f1:
+                print(f"New test_f1={test_f1:.4f} > current @{args.alias} test_f1={current_f1:.4f} — promoting")
+            else:
+                print(f"New test_f1={test_f1:.4f} <= current @{args.alias} test_f1={current_f1:.4f} — keeping existing version")
+                should_promote = False
+        except Exception:
+            # No existing alias — first time, always promote
+            print(f"No existing @{args.alias} found — promoting version {registered.version}")
+
+        if should_promote:
+            client.set_registered_model_alias(
+                name=arch,
+                alias=args.alias,
+                version=registered.version,
+            )
+            print(f"'{arch}' version {registered.version} promoted to @{args.alias}")
+
         print(f"MLflow run complete — view with: mlflow ui --backend-store-uri mlflow/")
 
 

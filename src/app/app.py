@@ -12,9 +12,11 @@ from PIL import Image
 from src.inference.predictor import Predictor
 from src.inference.bundle import load_bundle
 
+import os
+
 MLFLOW_TRACKING_URI = "mlflow"
-REGISTERED_MODEL = "lego-minifigure-finder"
-MODEL_ALIAS = "production"
+REGISTERED_MODEL = os.environ["REGISTERED_MODEL"]   # e.g. resnet18 | smallcnn
+MODEL_ALIAS = os.environ.get("MODEL_ALIAS", "production")
 
 predictor: Predictor | None = None
 model_info: dict = {}
