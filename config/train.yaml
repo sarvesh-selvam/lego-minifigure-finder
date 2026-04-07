@@ -11,13 +11,13 @@ pretrained: true        # only used for resnet18
 num_classes: 2
 epochs: 15
 lr: 0.0003
-weight_decay: 1e-4
+weight_decay: 0.0001
 freeze_epochs: 3
 seed: 27
 
 # ---- Outputs ----
 out_dir: artifacts
-run_name: test_v1
+run_name: test_v2
 
 # ---- Optional: S3 ----
 # Leave these as null for local training.
