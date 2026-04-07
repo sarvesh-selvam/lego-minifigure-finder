@@ -11,14 +11,24 @@ st.title("LEGO Minifigure Finder")
 st.caption("Upload an image to check whether it contains a LEGO minifigure.")
 
 # ---------------------------------------------------------------------------
-# Sidebar — API health check
+# Sidebar — API health check + model info
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.header("API Status")
     try:
         resp = requests.get(f"{API_URL}/health", timeout=2)
-        if resp.ok and resp.json().get("model_loaded"):
+        health = resp.json()
+        if resp.ok and health.get("model_loaded"):
             st.success("API online, model loaded")
+            st.divider()
+            st.subheader("Loaded Model")
+            st.markdown(f"**Name:** {health.get('registered_model', '—')}")
+            st.markdown(f"**Alias:** `@{health.get('alias', '—')}`")
+            st.markdown(f"**Version:** {health.get('version', '—')}")
+            st.markdown(f"**Run ID:** `{health.get('run_id', '—')}`")
+            st.markdown(f"**Arch:** {health.get('arch', '—')}")
+            st.markdown(f"**Image size:** {health.get('image_size', '—')}px")
+            st.markdown(f"**Threshold:** {health.get('threshold', '—')}")
         else:
             st.warning("API online but model not loaded")
     except requests.exceptions.ConnectionError:
@@ -56,13 +66,12 @@ if uploaded:
                 st.error(f"API error: {e.response.text}")
                 st.stop()
 
-        # Results
         label = result["pred_label"]
         confidence = result["positive_prob"]
         is_positive = result["is_positive"]
 
         if is_positive:
-            st.success(f"Minifigure detected!")
+            st.success("Minifigure detected!")
         else:
             st.info("No minifigure detected.")
 
