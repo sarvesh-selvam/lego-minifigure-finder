@@ -64,8 +64,8 @@ Key config options:
 |--------|---------|-------------|
 | `arch` | `resnet18` | Model architecture (`resnet18` or `smallcnn`) |
 | `pretrained` | `true` | Use ImageNet weights (ResNet18 only) |
-| `epochs` | `10` | Number of training epochs |
-| `lr` | `0.0003` | Learning rate (cosine annealed) |
+| `epochs` | `15` | Number of training epochs |
+| `lr` | `0.0003` | Learning rate |
 | `batch_size` | `32` | Batch size |
 | `run_name` | `test_v1` | Output directory name under `artifacts/` |
 
