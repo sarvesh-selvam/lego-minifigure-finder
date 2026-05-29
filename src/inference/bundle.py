@@ -5,8 +5,8 @@ import json
 import torch
 
 from src.data.transform import IMAGENET_MEAN, IMAGENET_STD
-from src.classifier.resnet import build_resnet18
-from src.classifier.small_cnn import SmallCNN
+from src.arch.resnet import build_resnet18
+from src.arch.small_cnn import SmallCNN
 from src.inference.predictor import Predictor
 from src.utils.device import get_device
 

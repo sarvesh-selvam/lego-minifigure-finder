@@ -9,8 +9,8 @@ import mlflow.pytorch
 from sklearn.metrics import classification_report, f1_score
 
 from src.data.data_loader import make_loaders
-from src.classifier.resnet import build_resnet18
-from src.classifier.small_cnn import build_small_cnn
+from src.arch.resnet import build_resnet18
+from src.arch.small_cnn import build_small_cnn
 from src.model.train import fit
 from src.model.evaluate import evaluate
 from src.utils.seed import set_seed
